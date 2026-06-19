@@ -13,34 +13,54 @@
 
 <div id="map"></div>
 
-<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=5285fdc7da347f156b1adda9a9faab95&autoload=false"></script>
-
 <script>
-kakao.maps.load(function() {
+// 1. GitHub Pages의 /route/ 하위 경로 구조에서 카카오 인증 버그를 우회하기 위한 동적 로드 방식
+(function() {
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    // autoload=false 옵션을 명시하여 완벽한 동기화를 보장합니다.
+    script.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=5285fdc7da347f156b1adda9a9faab95&autoload=false';
+    
+    script.onload = function() {
+        // 스크립트 파일 자체가 브라우저에 완전히 내려온 후 load 함수를 실행합니다.
+        kakao.maps.load(initMap);
+    };
+    
+    script.onerror = function() {
+        console.error("카카오맵 API 스크립트 로드에 실패했습니다. 키 또는 도메인을 확인하세요.");
+    };
+    
+    document.head.appendChild(script);
+})();
+
+// 2. 실제 지도를 초기화하고 데이터를 얹는 메인 함수
+function initMap() {
     var mapContainer = document.getElementById('map'), 
         mapOption = { 
-            // 처음에 지도가 뜰 기본 위치 (데이터를 찾으면 이 위치는 자동으로 무시됩니다)
-            center: new kakao.maps.LatLng(37.5665, 126.9780),
+            center: new kakao.maps.LatLng(37.5665, 126.9780), // 기본 서울 중심
             level: 8 
         }; 
     var map = new kakao.maps.Map(mapContainer, mapOption);
     var infowindow = new kakao.maps.InfoWindow({ removable: true });
-
-    // 🌟 중요: 모든 기사님의 영역을 포괄하는 지도의 경계(범위)를 계산할 객체 생성
     var bounds = new kakao.maps.LatLngBounds();
 
-    fetch('kimyongseok.json')
-        .then(response => response.json())
+    // GitHub Pages 환경을 고려하여 JSON 파일 호출 경로 보장
+    fetch('delivery_zones.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('HTTP error! status: ' + response.status);
+            }
+            return response.json();
+        })
         .then(geojson => {
             geojson.features.forEach(feature => {
                 var coordinates = feature.geometry.coordinates[0];
                 var path = [];
                 
-                // 좌표를 하나씩 변환하면서 지도 범위(bounds)에 확장 추가합니다.
                 coordinates.forEach(coord => {
                     var latLng = new kakao.maps.LatLng(coord[1], coord[0]);
                     path.push(latLng);
-                    bounds.extend(latLng); // 🌟 데이터의 위도/경도 위치를 bounds에 누적합니다.
+                    bounds.extend(latLng); // 기사님들 실제 좌표 위치 수집
                 });
 
                 var properties = feature.properties;
@@ -70,14 +90,13 @@ kakao.maps.load(function() {
                 });
             });
 
-            // 🌟 3. 모든 데이터를 다 읽었다면, 데이터가 있는 위치로 지도의 중심과 레벨을 자동으로 맞춰줍니다!
+            // 모든 좌표 데이터를 다 분석했다면, 서울 화면에서 기사님들 실제 지역으로 자동 카메라 이동!
             map.setBounds(bounds);
         })
         .catch(error => {
-            console.error('데이터를 불러오는 중 오류 발생:', error);
-            alert('delivery_zones.json 파일을 읽지 못했거나 파일 내 좌표 형식에 오류가 있습니다.');
+            console.error('데이터 파싱 또는 로드 실패:', error);
         });
-});
+}
 </script>
 </body>
 </html>
