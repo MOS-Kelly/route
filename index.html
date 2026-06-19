@@ -13,38 +13,22 @@
 
 <div id="map"></div>
 
-<script>
-// 1. GitHub Pages의 /route/ 하위 경로 구조에서 카카오 인증 버그를 우회하기 위한 동적 로드 방식
-(function() {
-    var script = document.createElement('script');
-    script.type = 'text/javascript';
-    // autoload=false 옵션을 명시하여 완벽한 동기화를 보장합니다.
-    script.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=5285fdc7da347f156b1adda9a9faab95';
-    
-    script.onload = function() {
-        // 스크립트 파일 자체가 브라우저에 완전히 내려온 후 load 함수를 실행합니다.
-        kakao.maps.load(initMap);
-    };
-    
-    script.onerror = function() {
-        console.error("카카오맵 API 스크립트 로드에 실패했습니다. 키 또는 도메인을 확인하세요.");
-    };
-    
-    document.head.appendChild(script);
-})();
+<script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=5285fdc7da347f156b1adda9a9faab95&autoload=false"></script>
 
-// 2. 실제 지도를 초기화하고 데이터를 얹는 메인 함수
-function initMap() {
+<script>
+// 2. 브라우저가 위의 카카오 스크립트 베이스를 다 읽은 직후, 안전하게 load 함수를 호출합니다.
+kakao.maps.load(function() {
     var mapContainer = document.getElementById('map'), 
         mapOption = { 
             center: new kakao.maps.LatLng(37.5665, 126.9780), // 기본 서울 중심
             level: 8 
         }; 
+    
     var map = new kakao.maps.Map(mapContainer, mapOption);
     var infowindow = new kakao.maps.InfoWindow({ removable: true });
     var bounds = new kakao.maps.LatLngBounds();
 
-    // GitHub Pages 환경을 고려하여 JSON 파일 호출 경로 보장
+    // 3. 깃허브 및 로컬 환경에서 delivery_zones.json 데이터를 호출합니다.
     fetch('delivery_zones.json')
         .then(response => {
             if (!response.ok) {
@@ -90,13 +74,13 @@ function initMap() {
                 });
             });
 
-            // 모든 좌표 데이터를 다 분석했다면, 서울 화면에서 기사님들 실제 지역으로 자동 카메라 이동!
+            // 모든 좌표 데이터 분석 후 실제 권역 위치로 지도 화면 자동 이동
             map.setBounds(bounds);
         })
         .catch(error => {
             console.error('데이터 파싱 또는 로드 실패:', error);
         });
-}
+});
 </script>
 </body>
 </html>
