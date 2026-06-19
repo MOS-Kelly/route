@@ -29,7 +29,7 @@ kakao.maps.load(function() {
     var bounds = new kakao.maps.LatLngBounds();
 
     // 3. 깃허브 및 로컬 환경에서 delivery_zones.json 데이터를 호출합니다.
-    fetch('delivery_zones.json')
+    fetch('kimyongseok.json')
         .then(response => {
             if (!response.ok) {
                 throw new Error('HTTP error! status: ' + response.status);
