@@ -141,36 +141,6 @@
         .calc-result-vertical .highlight-4 { color: #ff9f1c !important; font-size: 17px !important; }
         .calc-result-vertical .highlight-5 { color: #3182ce !important; font-size: 17px !important; }
 
-        /* PC용 마우스 추적 툴팁 */
-        .custom-tooltip {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.96);
-            color: #1c1c23;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            white-space: nowrap;
-            pointer-events: none;
-            display: none;
-            z-index: 999;
-            transform: translate(15px, 15px);
-        }
-        .tooltip-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
-            margin-top: 4px;
-        }
-        .tooltip-label { color: #666666; }
-        .tooltip-value { font-weight: bold; color: #1c1c23; }
-        .tooltip-divider {
-            border-bottom: 1px dashed #cbd5e0; 
-            margin: 6px 0;
-        }
-
         @media (max-width: 480px) {
             .map-control-box { top: 10px; left: 10px; width: calc(100% - 20px); }
             .calc-result-vertical { padding: 12px 15px !important; gap: 8px; }
@@ -185,21 +155,18 @@
         <button id="btn-calc" class="control-btn" onclick="switchData('calc')">📍구역별 물량</button>
     </div>
     
-    <div id="calc-result-box" class="calc-result-vertical">
-        </div>
+    <div id="calc-result-box" class="calc-result-vertical"></div>
 </div>
 
 <div id="map"></div>
-<div id="map-tooltip" class="custom-tooltip"></div>
 
 <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=5285fdc7da347f156b1adda9a9faab95&autoload=false"></script>
 
 <script>
-var map, bounds, tooltipEl, calcResultBoxEl;
+var map, bounds, calcResultBoxEl;
 var currentPolygons = []; 
 var currentMode = 'delivery'; 
 var selectedPolygons = new Set(); 
-var isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
 
 kakao.maps.load(function() {
     var mapContainer = document.getElementById('map'), 
@@ -209,7 +176,6 @@ kakao.maps.load(function() {
         }; 
     
     map = new kakao.maps.Map(mapContainer, mapOption);
-    tooltipEl = document.getElementById('map-tooltip');
     calcResultBoxEl = document.getElementById('calc-result-box');
 
     switchData('delivery');
@@ -221,7 +187,6 @@ function switchData(type) {
     document.getElementById('btn-delivery').classList.remove('active');
     document.getElementById('btn-calc').classList.remove('active');
     
-    tooltipEl.style.display = 'none';
     selectedPolygons.clear(); 
 
     if (type === 'delivery') {
@@ -234,11 +199,10 @@ function switchData(type) {
             </div>
         `;
         calcResultBoxEl.style.display = 'flex';
-        loadMapData('delivery.json', '👤 담당 기사');
+        loadMapData('delivery.json');
     } else if (type === 'calc') {
         document.getElementById('btn-calc').classList.add('active');
         
-        // 💡 [위치 최종 수정] 범례(legend-row)가 무조건 위로 오도록 상단 배치
         calcResultBoxEl.innerHTML = `
             <div class="calc-title">선택 구역 물량 합계</div>
             <div class="legend-row">
@@ -249,8 +213,7 @@ function switchData(type) {
                     * 도로명 주소 집계 기준으로, 주소 오기재, 지번주소만 입력된 건 등은 누락될 수 있습니다.
                 </div>
             </div>
-            <div id="single-info" class="single-info-box" style="display:none;">
-                </div>
+            <div id="single-info" class="single-info-box" style="display:none;"></div>
             <div class="calc-row">
                 <span class="calc-label">4월 물량 :</span>
                 <span id="calc-vol4-val" class="highlight-4">0 건</span>
@@ -261,7 +224,7 @@ function switchData(type) {
             </div>
         `;
         calcResultBoxEl.style.display = 'flex';
-        loadMapData('all.json', '📍 선택 권역');
+        loadMapData('all.json');
     }
 }
 
@@ -312,7 +275,7 @@ function updateCalcResultDisplay() {
     document.getElementById('calc-vol5-val').innerText = hasStr5 ? str5Val : totalVol5.toLocaleString() + " 건";
 }
 
-function loadMapData(jsonFileName, labelName) {
+function loadMapData(jsonFileName) {
     currentPolygons.forEach(polygon => polygon.setMap(null));
     currentPolygons = []; 
     bounds = new kakao.maps.LatLngBounds();
@@ -425,65 +388,7 @@ function loadMapData(jsonFileName, labelName) {
                 var siblingPolygons = masterData.polygons; 
                 var baseColor = polygon.customInfo.baseColor;
 
-                // 1. 마우스 오버 (PC)
-                kakao.maps.event.addListener(polygon, 'mouseover', function() {
-                    if (isMobile) return;
-                    
-                    if (currentMode === 'delivery') {
-                        siblingPolygons.forEach(p => {
-                            if (!p.customInfo.isSelected) {
-                                p.setOptions({ strokeWeight: 4, strokeColor: '#ffffff', fillColor: '#ef4444', fillOpacity: 0.6 });
-                            }
-                        });
-                        
-                        var finalDisplay4 = masterData.isStringMode4 ? masterData.fallbackStr4 : masterData.totalVolume4.toLocaleString() + " 건";
-                        var finalDisplay5 = masterData.isStringMode5 ? masterData.fallbackStr5 : masterData.totalVolume5.toLocaleString() + " 건";
-
-                        tooltipEl.innerHTML = `
-                            <div class="tooltip-row"><span class="tooltip-label">👤 담당 기사</span><span class="tooltip-value">${targetManager}</span></div>
-                            <div class="tooltip-divider"></div>
-                            <div class="tooltip-row"><span class="tooltip-label">4월 총합</span><span class="tooltip-value" style="color: #ff9f1c;">${finalDisplay4}</span></div>
-                            <div class="tooltip-row"><span class="tooltip-label">5월 총합</span><span class="tooltip-value" style="color: #3182ce;">${finalDisplay5}</span></div>
-                        `;
-                    } else {
-                        if (!polygon.customInfo.isSelected) {
-                            polygon.setOptions({ strokeWeight: 3, strokeColor: '#ffffff' });
-                        }
-                        tooltipEl.innerHTML = `
-                            <div class="tooltip-row"><span class="tooltip-label">구분 / 담당</span><span class="tooltip-value">${polygon.customInfo.type} (${targetManager})</span></div>
-                            <div class="tooltip-divider"></div>
-                            <div class="tooltip-row"><span class="tooltip-label">4월 물량</span><span class="tooltip-value" style="color: #ff9f1c;">${polygon.customInfo.displayStr4} 건</span></div>
-                            <div class="tooltip-row"><span class="tooltip-label">5월 물량</span><span class="tooltip-value" style="color: #3182ce;">${polygon.customInfo.displayStr5} 건</span></div>
-                        `;
-                    }
-                    tooltipEl.style.display = 'block';
-                });
-
-                // 2. 마우스 무브
-                kakao.maps.event.addListener(polygon, 'mousemove', function(mouseEvent) {
-                    if (isMobile) return;
-                    tooltipEl.style.left = (mouseEvent.point.x) + 'px';
-                    tooltipEl.style.top = (mouseEvent.point.y) + 'px';
-                });
-
-                // 3. 마우스 아웃
-                kakao.maps.event.addListener(polygon, 'mouseout', function() {
-                    if (isMobile) return;
-                    if (currentMode === 'delivery') {
-                        siblingPolygons.forEach(p => {
-                            if (!p.customInfo.isSelected) {
-                                p.setOptions({ strokeWeight: 2, strokeColor: p.customInfo.baseColor, fillColor: p.customInfo.baseColor, fillOpacity: 0.3 });
-                            }
-                        });
-                    } else {
-                        if (!polygon.customInfo.isSelected) {
-                            polygon.setOptions({ strokeWeight: 2, strokeColor: baseColor, fillColor: baseColor, fillOpacity: 0.35 });
-                        }
-                    }
-                    tooltipEl.style.display = 'none';
-                });
-
-                // 4. 마우스 클릭 / 모바일 터치
+                // 마우스 클릭 / 모바일 터치 이벤트만 남김
                 kakao.maps.event.addListener(polygon, 'click', function() {
                     var singleInfoEl = document.getElementById('single-info');
 
