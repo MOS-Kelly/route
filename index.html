@@ -3,11 +3,12 @@
 <head>
     <meta charset="utf-8">
     <title>담당 권역 관리 및 월별 물량 비교 지도</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Malgun Gothic', dotum, sans-serif; }
         #map { width: 100%; height: 100%; z-index: 1; }
         
-        /* 상단 제어 박스 (버튼과 세로 현황판을 하나로 묶음) */
+        /* 상단 제어 박스 */
         .map-control-box {
             position: absolute;
             top: 15px;
@@ -16,6 +17,8 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            max-width: 280px;
+            width: calc(100% - 30px);
         }
         .btn-row {
             display: flex;
@@ -27,15 +30,17 @@
             border: 1px solid rgba(0, 0, 0, 0.06);
         }
         .control-btn {
+            flex: 1;
             border: 1px solid #e2e8f0;
             background: #ffffff;
             color: #4a5568;
-            padding: 8px 16px;
+            padding: 10px 8px;
             font-size: 13px;
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s ease;
+            white-space: nowrap;
         }
         .control-btn:hover {
             background: #f7fafc;
@@ -48,7 +53,7 @@
             box-shadow: 0 2px 6px rgba(0, 85, 212, 0.3);
         }
 
-        /* 👑 [창 크기 확실하게 확장] 세로형 총 합계 현황판 */
+        /* 세로형 통합 현황판 */
         .calc-result-vertical {
             background: rgba(28, 28, 35, 0.96) !important;
             color: #ffffff !important;
@@ -57,10 +62,11 @@
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
             display: none; 
             flex-direction: column;
-            gap: 8px;
-            width: 260px !important; /* 창 크기를 260px로 확실히 키움 */
+            gap: 10px;
             letter-spacing: -0.5px;
             box-sizing: border-box;
+            max-height: 70vh;
+            overflow-y: auto;
         }
         .calc-result-vertical .calc-title {
             font-size: 14px !important;
@@ -68,49 +74,74 @@
             color: #e2e8f0 !important;
             border-bottom: 1px dashed rgba(255, 255, 255, 0.15);
             padding-bottom: 8px;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
+        }
+
+        /* 📌 터치/클릭한 개별 권역 정보 안내창 */
+        .single-info-box {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .single-info-box .info-header {
+            font-weight: bold;
+            color: #63b3ed;
+            margin-bottom: 2px;
         }
         
-        /* 🔍 [참고 문구 소형화 및 글씨 크기 다운] 색상별 권역 안내 스타일 */
+        /* 세로 정렬 라인 스타일 */
+        .info-v-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .info-v-label {
+            color: #cbd5e0;
+        }
+        .info-v-val {
+            font-weight: bold;
+        }
+        
+        /* 색상별 권역 안내 스타일 */
         .calc-result-vertical .legend-row {
             display: flex !important;
             flex-direction: column;
             gap: 5px;
-            font-size: 10.5px !important; /* 메인보다 확연히 작은 크기 */
-            color: #a0aec0 !important;    /* 눈에 피로가 덜한 흐린 서브 톤 */
-            background: rgba(255, 255, 255, 0.05);
+            font-size: 10.5px !important; 
+            color: #a0aec0 !important;    
+            background: rgba(255, 255, 255, 0.04);
             padding: 8px 12px;
             border-radius: 6px;
-            margin-bottom: 4px;
         }
         .legend-item {
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        .legend-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            display: inline-block;
-        }
 
-        /* 📈 [글씨 크게 키움] 월별 합계 노출 열 스타일 */
+        /* 월별 합계 노출 열 스타일 */
         .calc-result-vertical .calc-row {
             display: flex !important;
             justify-content: space-between !important;
-            font-size: 16px !important; /* 16px로 굵고 크게 변경 */
+            font-size: 15px !important; 
             font-weight: bold !important;
-            margin-top: 2px;
             align-items: center;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 8px;
+            margin-top: 2px;
         }
         .calc-result-vertical .calc-label {
             color: #cbd5e0 !important;
         }
-        .calc-result-vertical .highlight-4 { color: #ffffff !important; font-size: 18px !important; }
-        .calc-result-vertical .highlight-5 { color: #ffffff !important; font-size: 18px !important; }
+        .calc-result-vertical .highlight-4 { color: #ff9f1c !important; font-size: 17px !important; }
+        .calc-result-vertical .highlight-5 { color: #3182ce !important; font-size: 17px !important; }
 
-        /* 커서 위치를 따라다니는 순수 툴팁 CSS */
+        /* PC용 마우스 추적 툴팁 */
         .custom-tooltip {
             position: absolute;
             background: rgba(255, 255, 255, 0.96);
@@ -139,6 +170,11 @@
             border-bottom: 1px dashed #cbd5e0; 
             margin: 6px 0;
         }
+
+        @media (max-width: 480px) {
+            .map-control-box { top: 10px; left: 10px; width: calc(100% - 20px); }
+            .calc-result-vertical { padding: 12px 15px !important; gap: 8px; }
+        }
     </style>
 </head>
 <body>
@@ -146,30 +182,11 @@
 <div class="map-control-box">
     <div class="btn-row">
         <button id="btn-delivery" class="control-btn active" onclick="switchData('delivery')">👤 기사별 물량</button>
-        <button id="btn-calc" class="control-btn" onclick="switchData('calc')">🧮 권역 물량 계산</button>
+        <button id="btn-calc" class="control-btn" onclick="switchData('calc')">📍구역별 물량</button>
     </div>
     
     <div id="calc-result-box" class="calc-result-vertical">
-        <div class="calc-title">📍 선택 권역 물량 합계</div>
-        
-        <div class="legend-row">
-            <div class="legend-item"> 🔵 파랑색 : 아파트</div>
-            <div class="legend-item"> 🟡 노랑색 : 지번</div>
-            <div class="legend-item"> 🟢 초록색 : 오피스텔</div>
-            <div class="legend-item"> </div>
-            <div class="legend-item"> 도로명 주소 기준으로 집계된 물량으로, 지번주소만 기재 또는 주소지 오기재건은 누락되어 실제 물량과는 차이 있습니다.</div>
         </div>
-
-        <div class="calc-row">
-            <span class="calc-label">4월 물량 기준 :</span>
-            <span id="calc-vol4-val" class="highlight-4">0 건</span>
-        </div>
-        <div class="calc-row">
-            <span class="calc-label">5월 물량 기준 :</span>
-            <span id="calc-vol5-val" class="highlight-5">0 건</span>
-        </div>
-        
-    </div>
 </div>
 
 <div id="map"></div>
@@ -182,12 +199,13 @@ var map, bounds, tooltipEl, calcResultBoxEl;
 var currentPolygons = []; 
 var currentMode = 'delivery'; 
 var selectedPolygons = new Set(); 
+var isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
 
 kakao.maps.load(function() {
     var mapContainer = document.getElementById('map'), 
         mapOption = { 
             center: new kakao.maps.LatLng(37.5665, 126.9780), 
-            level: 8 
+            level: 8
         }; 
     
     map = new kakao.maps.Map(mapContainer, mapOption);
@@ -204,16 +222,44 @@ function switchData(type) {
     document.getElementById('btn-calc').classList.remove('active');
     
     tooltipEl.style.display = 'none';
-    calcResultBoxEl.style.display = 'none';
     selectedPolygons.clear(); 
 
     if (type === 'delivery') {
         document.getElementById('btn-delivery').classList.add('active');
+        
+        calcResultBoxEl.innerHTML = `
+            <div class="calc-title">기사별 권역, 물량 현황</div>
+            <div id="single-info" class="single-info-box">
+                <div class="info-header">지도 내 권역을 터치(클릭)하세요.</div>
+            </div>
+        `;
+        calcResultBoxEl.style.display = 'flex';
         loadMapData('delivery.json', '👤 담당 기사');
     } else if (type === 'calc') {
         document.getElementById('btn-calc').classList.add('active');
-        document.getElementById('calc-vol4-val').innerText = "0 건";
-        document.getElementById('calc-vol5-val').innerText = "0 건";
+        
+        // 💡 [위치 최종 수정] 범례(legend-row)가 무조건 위로 오도록 상단 배치
+        calcResultBoxEl.innerHTML = `
+            <div class="calc-title">선택 권역 물량 합계</div>
+            <div class="legend-row">
+                <div class="legend-item">🔵 파랑색 : 아파트</div>
+                <div class="legend-item">🟡 노랑색 : 지번</div>
+                <div class="legend-item">🟢 초록색 : 오피스텔</div>
+                <div class="legend-item" style="font-size:9.5px; line-height:1.3; margin-top:3px; color:#a0aec0;">
+                    * 도로명 주소 집계 기준으로, 주소 오기재, 지번주소만 입력된 건 등은 누락될 수 있습니다.
+                </div>
+            </div>
+            <div id="single-info" class="single-info-box" style="display:none;">
+                </div>
+            <div class="calc-row">
+                <span class="calc-label">4월 물량 :</span>
+                <span id="calc-vol4-val" class="highlight-4">0 건</span>
+            </div>
+            <div class="calc-row">
+                <span class="calc-label">5월 물량 :</span>
+                <span id="calc-vol5-val" class="highlight-5">0 건</span>
+            </div>
+        `;
         calcResultBoxEl.style.display = 'flex';
         loadMapData('all.json', '📍 선택 권역');
     }
@@ -240,6 +286,8 @@ function formatRawValue(val) {
 }
 
 function updateCalcResultDisplay() {
+    if (currentMode !== 'calc') return;
+    
     var totalVol4 = 0;
     var totalVol5 = 0;
     var hasStr4 = false;
@@ -326,6 +374,7 @@ function loadMapData(jsonFileName, labelName) {
 
                 var properties = feature.properties;
                 var name = properties.manager || properties.name || '미지정';
+                var zoneType = properties.type || '일반';
 
                 var raw4 = properties.volume_4 || properties.volume4 || properties.volume || 0;
                 var raw5 = properties.volume_5 || properties.volume5 || properties.volume || 0;
@@ -333,11 +382,10 @@ function loadMapData(jsonFileName, labelName) {
                 var baseColor = '#3b82f6'; 
 
                 if (currentMode === 'calc') {
-                    var type = properties.type;
-                    if (type === '아파트') baseColor = '#5370d9';       
-                    else if (type === '지번') baseColor = '#f79f1b';     
-                    else if (type === '오피스텔') baseColor = '#8fe269'; 
-                    else baseColor = '#475569';                         
+                    if (zoneType === '아파트') baseColor = '#5370d9';       
+                    else if (zoneType === '지번') baseColor = '#f79f1b';     
+                    else if (zoneType === '오피스텔') baseColor = '#8fe269'; 
+                    else baseColor = '#475569';                                         
                 } else {
                     baseColor = '#3b82f6'; 
                 }
@@ -355,6 +403,7 @@ function loadMapData(jsonFileName, labelName) {
 
                 polygon.customInfo = {
                     manager: name,
+                    type: zoneType,
                     rawVol4: raw4,
                     rawVol5: raw5,
                     zoneVolume4: parseVolume(raw4),
@@ -376,17 +425,14 @@ function loadMapData(jsonFileName, labelName) {
                 var siblingPolygons = masterData.polygons; 
                 var baseColor = polygon.customInfo.baseColor;
 
-                // 1. 마우스 오버 (Mouseover)
+                // 1. 마우스 오버 (PC)
                 kakao.maps.event.addListener(polygon, 'mouseover', function() {
+                    if (isMobile) return;
+                    
                     if (currentMode === 'delivery') {
                         siblingPolygons.forEach(p => {
                             if (!p.customInfo.isSelected) {
-                                p.setOptions({ 
-                                    strokeWeight: 4, 
-                                    strokeColor: '#ffffff', 
-                                    fillColor: '#ef4444', 
-                                    fillOpacity: 0.6 
-                                });
+                                p.setOptions({ strokeWeight: 4, strokeColor: '#ffffff', fillColor: '#ef4444', fillOpacity: 0.6 });
                             }
                         });
                         
@@ -394,73 +440,53 @@ function loadMapData(jsonFileName, labelName) {
                         var finalDisplay5 = masterData.isStringMode5 ? masterData.fallbackStr5 : masterData.totalVolume5.toLocaleString() + " 건";
 
                         tooltipEl.innerHTML = `
-                            <div class="tooltip-row">
-                                <span class="tooltip-label">👤 담당 기사</span>
-                                <span class="tooltip-value" style="font-size: 14px;">${targetManager}</span>
-                            </div>
+                            <div class="tooltip-row"><span class="tooltip-label">👤 담당 기사</span><span class="tooltip-value">${targetManager}</span></div>
                             <div class="tooltip-divider"></div>
-                            <div class="tooltip-row">
-                                <span class="tooltip-label">4월 물량</span>
-                                <span class="tooltip-value" style="color: #ff9f1c;">${finalDisplay4}</span>
-                            </div>
-                            <div class="tooltip-row">
-                                <span class="tooltip-label">5월 물량</span>
-                                <span class="tooltip-value" style="color: #0055d4;">${finalDisplay5}</span>
-                            </div>
+                            <div class="tooltip-row"><span class="tooltip-label">4월 총합</span><span class="tooltip-value" style="color: #ff9f1c;">${finalDisplay4}</span></div>
+                            <div class="tooltip-row"><span class="tooltip-label">5월 총합</span><span class="tooltip-value" style="color: #3182ce;">${finalDisplay5}</span></div>
                         `;
                     } else {
                         if (!polygon.customInfo.isSelected) {
                             polygon.setOptions({ strokeWeight: 3, strokeColor: '#ffffff' });
                         }
-                        
                         tooltipEl.innerHTML = `
-                            <div class="tooltip-row">
-                                <span class="tooltip-label">4월 물량</span>
-                                <span class="tooltip-value" style="color: #ff9f1c;">${polygon.customInfo.displayStr4}</span>
-                            </div>
-                            <div class="tooltip-row">
-                                <span class="tooltip-label">5월 물량</span>
-                                <span class="tooltip-value" style="color: #0055d4;">${polygon.customInfo.displayStr5}</span>
-                            </div>
+                            <div class="tooltip-row"><span class="tooltip-label">구분 / 담당</span><span class="tooltip-value">${polygon.customInfo.type} (${targetManager})</span></div>
+                            <div class="tooltip-divider"></div>
+                            <div class="tooltip-row"><span class="tooltip-label">4월 물량</span><span class="tooltip-value" style="color: #ff9f1c;">${polygon.customInfo.displayStr4} 건</span></div>
+                            <div class="tooltip-row"><span class="tooltip-label">5월 물량</span><span class="tooltip-value" style="color: #3182ce;">${polygon.customInfo.displayStr5} 건</span></div>
                         `;
                     }
                     tooltipEl.style.display = 'block';
                 });
 
-                // 2. 마우스 무브 (Mousemove)
+                // 2. 마우스 무브
                 kakao.maps.event.addListener(polygon, 'mousemove', function(mouseEvent) {
+                    if (isMobile) return;
                     tooltipEl.style.left = (mouseEvent.point.x) + 'px';
                     tooltipEl.style.top = (mouseEvent.point.y) + 'px';
                 });
 
-                // 3. 마우스 아웃 (Mouseout)
+                // 3. 마우스 아웃
                 kakao.maps.event.addListener(polygon, 'mouseout', function() {
+                    if (isMobile) return;
                     if (currentMode === 'delivery') {
                         siblingPolygons.forEach(p => {
                             if (!p.customInfo.isSelected) {
-                                p.setOptions({ 
-                                    strokeWeight: 2, 
-                                    strokeColor: p.customInfo.baseColor, 
-                                    fillColor: p.customInfo.baseColor, 
-                                    fillOpacity: 0.3 
-                                });
+                                p.setOptions({ strokeWeight: 2, strokeColor: p.customInfo.baseColor, fillColor: p.customInfo.baseColor, fillOpacity: 0.3 });
                             }
                         });
                     } else {
                         if (!polygon.customInfo.isSelected) {
-                            polygon.setOptions({
-                                strokeWeight: 2,
-                                strokeColor: baseColor,
-                                fillColor: baseColor,
-                                fillOpacity: 0.35
-                            });
+                            polygon.setOptions({ strokeWeight: 2, strokeColor: baseColor, fillColor: baseColor, fillOpacity: 0.35 });
                         }
                     }
                     tooltipEl.style.display = 'none';
                 });
 
-                // 4. 마우스 클릭 (Click)
+                // 4. 마우스 클릭 / 모바일 터치
                 kakao.maps.event.addListener(polygon, 'click', function() {
+                    var singleInfoEl = document.getElementById('single-info');
+
                     if (currentMode === 'delivery') {
                         var isAlreadySelected = polygon.customInfo.isSelected;
                         
@@ -468,12 +494,7 @@ function loadMapData(jsonFileName, labelName) {
                             allPolygons.forEach(p => {
                                 if (p.customInfo.isSelected) {
                                     p.customInfo.isSelected = false;
-                                    p.setOptions({
-                                        strokeWeight: 2,
-                                        strokeColor: p.customInfo.baseColor,
-                                        fillColor: p.customInfo.baseColor,
-                                        fillOpacity: 0.3
-                                    });
+                                    p.setOptions({ strokeWeight: 2, strokeColor: p.customInfo.baseColor, fillColor: p.customInfo.baseColor, fillOpacity: 0.3 });
                                 }
                             });
                         }
@@ -482,43 +503,57 @@ function loadMapData(jsonFileName, labelName) {
                         siblingPolygons.forEach(p => {
                             p.customInfo.isSelected = nextState;
                             if (nextState) {
-                                p.setOptions({
-                                    strokeWeight: 4,
-                                    strokeColor: '#ffffff',
-                                    fillColor: '#ef4444',
-                                    fillOpacity: 0.6
-                                });
+                                p.setOptions({ strokeWeight: 4, strokeColor: '#ffffff', fillColor: '#ef4444', fillOpacity: 0.6 });
                             } else {
-                                p.setOptions({
-                                    strokeWeight: 2,
-                                    strokeColor: p.customInfo.baseColor,
-                                    fillColor: p.customInfo.baseColor,
-                                    fillOpacity: 0.3
-                                });
+                                p.setOptions({ strokeWeight: 2, strokeColor: p.customInfo.baseColor, fillColor: p.customInfo.baseColor, fillOpacity: 0.3 });
                             }
                         });
+
+                        if (nextState) {
+                            var finalDisplay4 = masterData.isStringMode4 ? masterData.fallbackStr4 : masterData.totalVolume4.toLocaleString() + " 건";
+                            var finalDisplay5 = masterData.isStringMode5 ? masterData.fallbackStr5 : masterData.totalVolume5.toLocaleString() + " 건";
+                            
+                            singleInfoEl.innerHTML = `
+                                <div class="info-header"> 담당 기사 : ${targetManager}</div>
+                                <div style="margin-top:2px;">4월 물량: <span style="font-weight:bold; color:#ff9f1c;">${finalDisplay4}</span></div>
+                                <div>5월 물량: <span style="font-weight:bold; color:#63b3ed;">${finalDisplay5}</span></div>
+                            `;
+                        } else {
+                            singleInfoEl.innerHTML = `
+                                <div class="info-header">지도 내 권역을 터치(클릭)하세요.</div>
+                            `;
+                        }
+
                     } else if (currentMode === 'calc') {
                         if (!polygon.customInfo.isSelected) {
                             polygon.customInfo.isSelected = true;
                             selectedPolygons.add(polygon);
-                            
-                            polygon.setOptions({
-                                strokeWeight: 4,
-                                strokeColor: '#ffffff',
-                                fillColor: '#ef4444', 
-                                fillOpacity: 0.6  
-                            });
+                            polygon.setOptions({ strokeWeight: 4, strokeColor: '#ffffff', fillColor: '#ef4444', fillOpacity: 0.6 });
                         } else {
                             polygon.customInfo.isSelected = false;
                             selectedPolygons.delete(polygon);
-                            
-                            polygon.setOptions({
-                                strokeWeight: 2,
-                                strokeColor: baseColor,
-                                fillColor: baseColor,
-                                fillOpacity: 0.35
-                            });
+                            polygon.setOptions({ strokeWeight: 2, strokeColor: baseColor, fillColor: baseColor, fillOpacity: 0.35 });
                         }
+                        
+                        if (polygon.customInfo.isSelected) {
+                            singleInfoEl.style.display = 'flex';
+                            singleInfoEl.innerHTML = `
+                                <div class="info-header">📍 선택한 권역 (${polygon.customInfo.type})</div>
+                                <div class="info-v-row">
+                                    <span class="info-v-label">4월 :</span>
+                                    <span class="info-v-val" style="color:#ff9f1c;">${polygon.customInfo.displayStr4} 건</span>
+                                </div>
+                                <div class="info-v-row">
+                                    <span class="info-v-label">5월 :</span>
+                                    <span class="info-v-val" style="color:#63b3ed;">${polygon.customInfo.displayStr5} 건</span>
+                                </div>
+                            `;
+                        } else {
+                            if(selectedPolygons.size === 0) {
+                                singleInfoEl.style.display = 'none';
+                            }
+                        }
+
                         updateCalcResultDisplay();
                     }
                 });
